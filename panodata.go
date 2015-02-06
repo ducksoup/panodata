@@ -83,21 +83,29 @@ func (query Query) Run(nc int) (photos []Photo, err error) {
 }
 
 // response defines the schema of a Panoramio API response.
-type response struct {
+type parsedResp struct {
 	Count  int64   `json:"count"`
 	Photos []Photo `json:"photos"`
 }
 
-func doRequest(url string) (body response, err error) {
+func doRequest(url string) (*parsedResp, error) {
+	var parsed parsedResp
+
 	resp, err := http.Get(url)
 	if err != nil {
-		return
+		return nil, fmt.Errorf("panodata: http errror %v", err)
 	}
 	defer resp.Body.Close()
 
+	if c := resp.StatusCode; c < 200 || c >= 300 {
+		return nil, fmt.Errorf("panodata: request returned status code %v", c)
+	}
+
 	decoder := json.NewDecoder(resp.Body)
-	err = decoder.Decode(&body)
-	return
+	if err = decoder.Decode(&parsed); err != nil {
+		return nil, fmt.Errorf("panodata: json parsing error %v", err)
+	}
+	return &parsed, nil
 }
 
 func addRange(url string, from, to int) string {
